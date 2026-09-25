@@ -1,0 +1,98 @@
+================================================================================
+ledd 2.0 - 编译与部署
+================================================================================
+
+【环境】
+    NDK：D:\download\android-ndk-r30-windows\android-ndk-r30
+    目标：Android arm64-v8a
+    API：android-21
+    设备：Lenovo L79031（Android 10, Magisk）
+
+【编译】
+
+  方式 1：手动一条命令
+    cd C:\android\ledi2cNEW
+    设置变量：
+      $NDK = "D:\download\android-ndk-r30-windows\android-ndk-r30"
+      $CC  = "$NDK\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android21-clang.cmd"
+
+    编译全部：
+      & $CC -O2 -Wall -I include -c src\main.c -o main.o
+      ...（每个 .c 一次）
+      & $CC -o ledd *.o -lm -pie -fPIE
+
+  方式 2：ndk-build（用 jni/Android.mk）
+    cd C:\android\ledi2cNEW
+    & "$NDK\ndk-build.cmd" NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni\Android.mk NDK_APPLICATION_MK=jni\Application.mk
+
+  常见问题：
+    - undefined symbol: cosf / sinf / fmodf
+       加 -lm
+
+    - TabError / 缩进错误
+       全部用空格，不用 Tab
+
+    - implicit declaration
+       检查 #include
+
+【部署】
+
+  1. 推送到设备
+    adb push ledd /data/local/tmp/ledd_new
+
+  2. 停旧进程
+    adb shell "su -c 'killall -9 ledd'"
+    Start-Sleep -Milliseconds 500
+
+  3. 备份 + 替换
+    adb shell "su -c 'cp /system/bin/ledd /system/bin/ledd.bak'"
+    adb shell "su -c 'cp /data/local/tmp/ledd_new /system/bin/ledd'"
+    adb shell "su -c 'chmod 755 /system/bin/ledd'"
+
+  4. 清 socket
+    adb shell "su -c 'rm -f /data/local/tmp/ledd.sock'"
+
+  5. 启动
+    adb shell "su -c 'nohup /system/bin/ledd > /data/local/tmp/ledd.log 2>&1 &'"
+
+  6. 检查
+    adb shell "su -c 'ps -A | grep ledd'"
+    adb shell "su -c 'cat /data/local/tmp/ledd.log'"
+
+【PC 端调试】
+
+  1. 设 forward
+    adb forward tcp:9999 localfilesystem:/data/local/tmp/ledd.sock
+
+  2. 用 PowerShell 发命令
+    $c = New-Object System.Net.Sockets.TcpClient
+    $c.Connect('127.0.0.1', 9999)
+    $s = $c.GetStream()
+    $b = [Text.Encoding]::ASCII.GetBytes("STATIC:255:0:0`n")
+    $s.Write($b, 0, $b.Length); $s.Flush()
+    $c.Close()
+
+  3. 注意
+    - forward 在 adb 重启、USB 重插后会丢，需重设
+    - 用 127.0.0.1 比 localhost 更稳
+
+【查看状态】
+
+  进程：
+    adb shell "su -c 'ps -A | grep ledd'"
+
+  日志：
+    adb shell "su -c 'tail -50 /data/local/tmp/ledd.log'"
+
+  CPU：
+    adb shell 'top -n 1 -b | grep ledd'
+    看 TIME+ 列（累计 CPU 时间），比 %CPU 更准
+
+  socket：
+    adb shell "su -c 'ls -l /data/local/tmp/ledd.sock'"
+
+【开机自启】
+    通过 init.rc 或 Magisk 脚本（见旧项目配置）
+    注意 SELinux 权限
+
+================================================================================

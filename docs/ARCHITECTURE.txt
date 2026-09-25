@@ -1,0 +1,197 @@
+================================================================================
+ledd 2.0 - 架构与模块
+================================================================================
+
+【分层】
+    应用层：main（协调）
+    业务层：command / effect / source / audio
+    抽象层：socket / timer
+    硬件层：i2c
+    基础层：log / util
+
+【依赖方向】
+    上层依赖下层，下层不知道上层
+    不跨层调用
+
+【模块清单】
+
+    main.c
+        职责：入口、初始化、epoll 主循环、信号处理、清理
+        依赖：全部
+        行数目标：< 200
+
+    i2c.c
+        职责：AW9106 通信（初始化、写颜色、写亮度）
+        依赖：log、util
+        关键：
+          - I2C_SLAVE_FORCE
+          - 7 字节合并写颜色（0x20 起）
+          - 0x12/0x13/0x14 初始化只写一次
+          - 0x11 亮度只初始化写一次
+
+    socket.c
+        职责：监听、accept、行缓冲、多客户端
+        依赖：log
+        关键：
+          - 固定数组 8 个 client
+          - 每 client 512 字节行缓冲
+          - 非阻塞
+          - 按 \n 拆行
+          - 返回值：1=有行 / 0=暂无 / -1=断开
+
+    command.c
+        职责：命令解析（查表 + handler）
+        依赖：effect、source、audio、log、util
+        关键：
+          - 命令表（名字 + handler）
+          - 冒号分隔
+          - 参数缺省用默认
+
+    effect.c
+        职责：效果引擎（表 + 主逻辑）
+        依赖：i2c、timer、source、log
+        关键：
+          - EffectOps 结构体（name / need_timer / enter / tick / exit）
+          - g_effects[] 表
+          - effect_refresh_timer()：决定 timerfd 启停
+          - 规则：timerfd 跑 = (source == MIC) && (effect need_timer)
+
+    effect_*.c
+        职责：单个效果（7 个文件）
+        依赖：effect.h、util.h、i2c.h
+        关键：
+          - 每个文件暴露 enter/tick
+          - 无状态初始化放在 enter
+          - tick 每帧调用（timerfd 跑时才调）
+
+    source.c
+        职责：数据源（mic / system）
+        依赖：effect、log
+        关键：
+          - 只有两个值（无 off）
+          - source_set 时触发 effect_refresh_timer
+          - OFF 是独立命令，不影响 source
+
+    audio.c
+        职责：AUDIO:r,g,b  写颜色
+        依赖：effect
+        关键：
+          - 一行代码（sscanf + effect_output）
+          - 无状态、无判断
+
+    timer.c
+        职责：timerfd 封装
+        依赖：log
+        关键：
+          - 使用 TFD_TIMER_ABSTIME（防漂移）
+          - timer_start / timer_stop / timer_drain
+          - 非阻塞
+
+    log.c
+        职责：分级日志
+        依赖：无
+        关键：
+          - LOGD / LOGI / LOGW / LOGE
+          - 带时间戳、模块名
+          - 输出到 stderr
+
+    util.c
+        职责：工具函数
+        依赖：无
+        关键：
+          - now_ms()
+          - clampi / clampf
+          - hsv2rgb()
+
+【数据流】
+
+    [App 发命令]
+    socket recv
+       socket_recv_line（行缓冲）
+       command_handle（查表）
+       handler
+       effect_set_mode / effect_set_color / ...
+       effect_refresh_timer（决定 timerfd）
+       i2c_write_color（如果是静态）
+
+    [timerfd 触发]
+    epoll_wait 返回
+       timer_drain
+       effect_tick（调当前效果的 tick）
+       effect_output
+       i2c_write_color
+
+    [audiohook 发 AUDIO]
+    socket recv
+       command_handle
+       cmd_audio
+       audio_handle
+       effect_output
+       i2c_write_color
+
+【timerfd 规则（核心）】
+
+    timerfd 跑的条件 = (source == SRC_MIC) && (effect need_timer)
+
+    什么时候评估：
+      - effect_set_mode 时
+      - source_set 时
+       都调 effect_refresh_timer
+
+    效果分类：
+      E_OFF      need_timer = 0
+      E_STATIC   need_timer = 0
+      E_FADE     need_timer = 1
+      E_BREATH   need_timer = 1
+      E_STROBE   need_timer = 1
+      E_RAINBOW  need_timer = 1
+      E_PULSE    need_timer = 1
+      E_RANDOM   need_timer = 1
+
+    空闲状态（CPU  0%）：
+      - E_OFF
+      - E_STATIC（设色后）
+      - source = SRC_SYSTEM
+
+【扩展方式：加新效果】
+
+    1. include/ledd.h 的 EffectMode 加枚举
+    2. 新建 src/effect_xxx.c，写 eff_xxx_enter / eff_xxx_tick
+    3. include/effect.h 加声明
+    4. src/effect.c 的表加一项
+    5. jni/Android.mk 加文件
+    6. command.c 加命令（可选）
+
+    不改：main.c、socket.c、i2c.c、timer.c、source.c
+
+【socket 多客户端模型】
+
+    固定数组 g_clients[8]
+    每项：fd / buf[512] / pos
+    查找：线性（最多 8 次）
+    无 malloc、无链表
+
+    行缓冲：
+      收到数据  追加到 buf
+      遇 \n  取出该行，返回
+      半行  缓存等下次
+      多行  一次 recv 逐行返回
+
+【主循环（伪代码）】
+
+    epoll_wait(-1)   // 睡死
+    for e in events:
+      if e.fd == listen_fd:   循环 accept
+      if e.fd == timer_fd:    timer_drain + effect_tick
+      if e.fd == signal_fd:   清理 + 退出
+      if e.fd 是 client:      recv_line  command_handle
+
+【为什么空闲时 CPU  0%】
+
+    - epoll_wait 无限阻塞
+    - timerfd 停掉时不产生事件
+    - 没有主循环空转
+    - 没有文件轮询
+    - 静态色不重复写 I2C
+
+================================================================================
