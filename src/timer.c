@@ -37,10 +37,10 @@ void timer_start(void) {
     its.it_interval.tv_sec  = 0;
     its.it_interval.tv_nsec = ns;
     its.it_value.tv_sec     = 0;
-    its.it_value.tv_nsec    = ns;
+    its.it_value.tv_nsec    = ns;   /* 相对：20ms 后首次触发 */
 
-    /* ABSTIME：绝对时间，避免累积漂移 */
-    if (timerfd_settime(g_tfd, TFD_TIMER_ABSTIME, &its, NULL) < 0) {
+    /* 相对模式：it_value 是"时长"，不是绝对时间点 */
+    if (timerfd_settime(g_tfd, 0, &its, NULL) < 0) {
         LOGE("timer", "start fail: %s", strerror(errno));
         return;
     }

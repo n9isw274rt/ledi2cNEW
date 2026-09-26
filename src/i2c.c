@@ -75,7 +75,6 @@ int i2c_write_color(int r, int g, int b) {
 int i2c_write_bright(int bright) {
     if (g_fd < 0) return -1;
     bright = clampi(bright, 0, 3);
-    if (bright > 3) bright = 3;
     return i2c_w2(0x11, (unsigned char)bright);
 }
 

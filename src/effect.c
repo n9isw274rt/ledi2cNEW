@@ -88,7 +88,6 @@ void effect_tick(long now) {
     if (g_effects[g_mode].tick) g_effects[g_mode].tick(now);
 }
 
-void effect_set_color(int r, int g, int b) { g_R = r; g_G = g; g_B = b; }
 
 void effect_set_fade_dur(int ms) { if (ms >= 10 && ms <= 10000) g_params.fade_dur = ms; }
 void effect_set_breath(int period, int bmin, int bmax) {
@@ -123,6 +122,12 @@ void effect_get_current(int *r, int *g, int *b) {
     if (b) *b = g_cur_B;
 }
 
+/* FADE 等一次性效果完成后调用：切回 STATIC，停 timerfd */
+void effect_finish(void) {
+    if (g_mode != E_STATIC && g_mode != E_OFF) {
+        effect_set_mode(E_STATIC);
+    }
+}
 const char *effect_get_mode_name(void) {
     if (g_mode < 0 || g_mode >= E_COUNT) return "?";
     return g_effects[g_mode].name;

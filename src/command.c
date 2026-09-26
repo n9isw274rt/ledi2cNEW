@@ -15,7 +15,6 @@ static int cmd_static(const char *args) {
     int r, g, b;
     if (sscanf(args, "%d:%d:%d", &r, &g, &b) != 3) return -1;
     r = clampi(r,0,255); g = clampi(g,0,255); b = clampi(b,0,255);
-    effect_set_color(r, g, b);
     effect_set_target(r, g, b);
     effect_set_mode(E_STATIC);
     return 0;
@@ -26,7 +25,6 @@ static int cmd_fade(const char *args) {
     int n = sscanf(args, "%d:%d:%d:%d:%d", &r, &g, &b, &bright, &ms);
     if (n < 3) return -1;
     r = clampi(r,0,255); g = clampi(g,0,255); b = clampi(b,0,255);
-    effect_set_color(r, g, b);
     effect_set_target(r, g, b);
     if (n >= 5) effect_set_fade_dur(ms);
     effect_set_mode(E_FADE);
@@ -38,7 +36,6 @@ static int cmd_breath(const char *args) {
     int n = sscanf(args, "%d:%d:%d:%d:%d:%d", &r, &g, &b, &period, &bmin, &bmax);
     if (n < 3) return -1;
     r = clampi(r,0,255); g = clampi(g,0,255); b = clampi(b,0,255);
-    effect_set_color(r, g, b);
     effect_set_target(r, g, b);
     effect_set_breath(period, bmin, bmax);
     effect_set_mode(E_BREATH);
@@ -50,7 +47,6 @@ static int cmd_strobe(const char *args) {
     int n = sscanf(args, "%d:%d:%d:%d:%d:%d", &r, &g, &b, &on, &off, &edge);
     if (n < 3) return -1;
     r = clampi(r,0,255); g = clampi(g,0,255); b = clampi(b,0,255);
-    effect_set_color(r, g, b);
     effect_set_target(r, g, b);
     effect_set_strobe(on, off, edge);
     effect_set_mode(E_STROBE);
@@ -71,7 +67,6 @@ static int cmd_pulse(const char *args) {
     int n = sscanf(args, "%d:%d:%d:%d:%d:%d", &r, &g, &b, &period, &bmin, &bmax);
     if (n < 3) return -1;
     r = clampi(r,0,255); g = clampi(g,0,255); b = clampi(b,0,255);
-    effect_set_color(r, g, b);
     effect_set_target(r, g, b);
     effect_set_pulse(period, bmin, bmax);
     effect_set_mode(E_PULSE);
@@ -96,7 +91,6 @@ static int cmd_off(const char *args) {
 
 /* SOURCE:mic|system */
 static int cmd_source(const char *args) {
-    if (!args) return -1;
     if (strcasecmp(args, "mic") == 0) {
         source_set(SRC_MIC);
     } else if (strcasecmp(args, "system") == 0) {

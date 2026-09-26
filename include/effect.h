@@ -46,9 +46,10 @@ void eff_random_tick(long now);
 void effect_init(void);
 void effect_set_mode(EffectMode mode);
 void effect_tick(long now);
+void effect_finish(void);
 void effect_refresh_timer(void);
 
-void effect_set_color(int r, int g, int b);
+
 
 void effect_set_fade_dur(int ms);
 void effect_set_breath(int period, int bmin, int bmax);

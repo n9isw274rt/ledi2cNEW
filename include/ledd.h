@@ -1,7 +1,7 @@
 #ifndef LEDD_H
 #define LEDD_H
 
-#define LEDD_VERSION       "2.0.0"
+#define LEDD_VERSION       "2.0.1"
 #define LEDD_I2C_BUS       6
 #define LEDD_I2C_ADDR      0x5b
 #define LEDD_SOCK_PATH     "/data/local/tmp/ledd.sock"

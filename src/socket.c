@@ -147,7 +147,7 @@ int socket_recv_line(int fd, char *out, int size) {
     /* 先看缓冲里有没有完整行 */
     if (extract_line(cl, out, size) > 0) return 1;
 
-    /* 缓冲满且没找到 \n，丢一半（防死） */
+    /* 缓冲满且没找到 \n，全丢（防死） */
     if (cl->pos >= LEDD_LINE_BUF) {
         LOGW("socket", "fd=%d line buffer overflow, drop", fd);
         cl->pos = 0;

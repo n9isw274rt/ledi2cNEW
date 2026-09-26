@@ -155,12 +155,13 @@ int main(void) {
 
             /* client 数据 */
             if (socket_is_client(fd)) {
-                int ret = socket_recv_line(fd, line, sizeof(line));
+                int ret;
+                while ((ret = socket_recv_line(fd, line, sizeof(line))) == 1) {
+                    command_handle(line);
+                }
                 if (ret < 0) {
                     epoll_ctl(g_epfd, EPOLL_CTL_DEL, fd, NULL);
                     socket_close_client(fd);
-                } else if (ret == 1) {
-                    command_handle(line);
                 }
                 /* ret == 0: 暂无完整行，继续等 */
                 continue;

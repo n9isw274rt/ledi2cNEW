@@ -30,6 +30,7 @@ void eff_fade_tick(long now) {
     if (elapsed >= dur) {
         effect_output(to_R, to_G, to_B);
         active = 0;
+        effect_finish();   /* 切回 STATIC，停 timerfd */
         return;
     }
     float t = (float)elapsed / (float)dur;
